@@ -1,5 +1,15 @@
 #!/bin/sh
 
+#SCANNER_DIR=/Users/bwauth/torflow/NetworkScanners/BwAuthority
+
+if [ ! -n "$SCANNER_DIR" ]; then
+  SCANNER_DIR=$(dirname "$0")
+  # macOS and BSD have no eauivalent to Linux's readlink -f
+  SCANNER_DIR=$(readlink -f "$SCANNER_DIR")
+fi
+
+cd "$SCANNER_DIR"
+
 # Number of applications to run.
 SCANNERS_PER_TOR_COUNT=1
 TOR_COUNT=1

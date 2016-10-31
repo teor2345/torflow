@@ -1,7 +1,12 @@
 #!/bin/sh
 
-SCANNER_DIR=$(dirname "$0")
-SCANNER_DIR=$(readlink -f "$SCANNER_DIR")
+#SCANNER_DIR=/Users/bwauth/torflow/NetworkScanners/BwAuthority
+
+if [ ! -n "$SCANNER_DIR" ]; then
+  SCANNER_DIR=$(dirname "$0")
+  # macOS and BSD have no eauivalent to Linux's readlink -f
+  SCANNER_DIR=$(readlink -f "$SCANNER_DIR")
+fi
 
 TIMESTAMP=`date +%Y%m%d-%H%M`
 ARCHIVE=$SCANNER_DIR/data/bwscan.${TIMESTAMP}
