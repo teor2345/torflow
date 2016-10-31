@@ -59,14 +59,16 @@ __selmgr = PathSupport.SelectionManager(
       order_exits=False,
       percent_fast=100,
       percent_skip=0,
-      min_bw=1024,
+      min_bw=0, # In a test network, scan every node, to avoid skipping
+                # nodes that have low traffic by chance
       use_all_exits=False,
       uniform=True,
       use_exit=None,
       use_guards=False,
       exit_ports=[443],
       order_by_ratio=True, # XXX: may be a poor idea for PID control?
-      min_exits=10)
+      min_exits=3) # 1 means no exits (yes, this seems like a bug),
+                   # so say 3 to get 2 exits for redundancy
 
 # exit code to indicate scan completion
 # make sure to update this in bwauthority.py as well

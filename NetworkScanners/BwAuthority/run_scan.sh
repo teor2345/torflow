@@ -1,8 +1,8 @@
 #!/bin/sh
 
 # Number of applications to run.
-SCANNERS_PER_TOR_COUNT=4
-TOR_COUNT=2
+SCANNERS_PER_TOR_COUNT=1
+TOR_COUNT=1
 SCANNER_COUNT=$(($SCANNERS_PER_TOR_COUNT * $TOR_COUNT + 1))
 
 # This tor must have the w status line fix as well as the stream bw fix
