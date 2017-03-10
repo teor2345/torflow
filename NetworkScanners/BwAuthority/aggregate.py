@@ -344,7 +344,10 @@ def write_file_list(datadir):
       continue
     for f in xrange(len(file_sizes)):
       if bw > file_sizes[f]*1024 and file_sizes[f] > prev_size:
-        next_f = max(f-1,0)
+        if f-1 >= 0:
+          next_f = f-1
+        else:
+          break
         file_pairs.append((pct,files[file_sizes[next_f]]))
         prev_size = file_sizes[f]
         prev_pct = pct
