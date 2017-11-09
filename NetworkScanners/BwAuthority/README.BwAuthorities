@@ -165,7 +165,7 @@ The server will consume around 12-15Gbytes/day.
 Here are two shell script snippets to generate the files we will need 
 for scanning and testing:
 
-for i in 64 32 16 8 4 2 1; do
+for i in 128 64 32 16 8 4 2 1; do
   dd if=/dev/urandom of=./${i}M bs=1k count=`expr $i \* 1024`
 done
 
