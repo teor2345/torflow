@@ -1,5 +1,7 @@
 ## Configuration file for metatroller on alternate prot
-SocksPort 9110 # what port to advertise for application connections
+# what port to advertise for application connections
+# match the Tor Browser settings
+SocksPort 9110 IPv6Traffic PreferIPv6
 ControlPort 9111
 SafeLogging 0
 Log notice file ./data/tor.1/tor.log
