@@ -423,21 +423,34 @@ def main(argv):
           for sr, sd, files in os.walk(da+"/"+ds+"/scan-data"):
             for f in files:
               if re.search("^bws-[\S]+-done-", f):
-                fp = file(sr+"/"+f, "r")
-                slicenum = sr+"/"+fp.readline()
-                timestamp = float(fp.readline())
-                fp.close()
+                file_error = False
+                try:
+                  fp = file(sr+"/"+f, "r")
+                  slicenum = sr+"/"+fp.readline()
+                  timestamp = float(fp.readline())
+                except IOError as e:
+                  plog("WARN", "Error reading file '"+sr+"/"+f+"': " + str(e))
+                  file_error = True
+                except ValueError as e:
+                  plog("WARN", "Error parsing file '"+sr+"/"+f+"': " + str(e))
+                  file_error = True
                 # old measurements are probably
                 # better than no measurements. We may not
                 # measure hibernating routers for days.
-                # This filter is just to remove REALLY old files
-                if time.time() - timestamp > MAX_AGE:
+                # This filter is just to remove REALLY old or broken files
+                if time.time() - timestamp > MAX_AGE or file_error:
                   sqlf = f.replace("bws-", "sql-")
-                  plog("INFO", "Removing old file "+f+" and "+sqlf)
-                  os.remove(sr+"/"+f)
+                  desc = "old"
+                  if file_error:
+                    desc = "broken"
+                  plog("INFO", "Removing "+desc+" file "+f+" and "+sqlf)
+                  try:
+                    os.remove(sr+"/"+f)
+                  except IOError as e:
+                    plog("WARN", "Error removing "+desc+" file '"+sr+"/"+f+"': " + str(e))
                   try:
                     os.remove(sr+"/"+sqlf)
-                  except:
+                  except IOError:
                     pass # In some cases the sql file may not exist
                   continue
                 if timestamp > newest_timestamp:
