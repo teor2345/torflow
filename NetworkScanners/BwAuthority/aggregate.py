@@ -10,7 +10,6 @@ import traceback
 sys.path.append("../../")
 from TorCtl.TorUtil import plog
 from TorCtl import TorCtl,TorUtil
-from TorCtl.PathSupport import VersionRangeRestriction, NodeRestrictionList, NotNodeRestriction
 
 bw_files = []
 nodes = {}
@@ -172,9 +171,10 @@ class Node:
       self.desc_bw = line.desc_bw
       self.circ_fail_rate = line.circ_fail_rate
       self.strm_fail_rate = line.strm_fail_rate
+      self.scanner = line.filename
 
 class Line:
-  def __init__(self, line, slice_file, timestamp):
+  def __init__(self, line, slice_file, timestamp, filename):
     self.idhex = re.search("[\s]*node_id=([\S]+)[\s]*", line).group(1)
     self.nick = re.search("[\s]*nick=([\S]+)[\s]*", line).group(1)
     self.strm_bw = int(re.search("[\s]*strm_bw=([\S]+)[\s]*", line).group(1))
@@ -182,6 +182,7 @@ class Line:
     self.ns_bw = int(re.search("[\s]*ns_bw=([\S]+)[\s]*", line).group(1))
     self.desc_bw = int(re.search("[\s]*desc_bw=([\S]+)[\s]*", line).group(1))
     self.slice_file = slice_file
+    self.filename = filename
     self.measured_at = timestamp
     try:
       self.circ_fail_rate = float(re.search("[\s]*circ_fail_rate=([\S]+)[\s]*", line).group(1))
@@ -451,7 +452,7 @@ def main(argv):
     fp.readline() # timestamp
     for l in fp.readlines():
       try:
-        line = Line(l,s,t)
+        line = Line(l,s,t,f.replace(argv[1], ""))
         if line.idhex not in nodes:
           n = Node()
           nodes[line.idhex] = n
@@ -492,10 +493,15 @@ def main(argv):
 
     for cl in ["Guard+Exit", "Guard", "Exit", "Middle"]:
       c_nodes = filter(lambda n: n.node_class() == cl, nodes.itervalues())
-      true_filt_avg[cl] = sum(map(lambda n: n.filt_bw, c_nodes))/float(len(c_nodes))
-      true_strm_avg[cl] = sum(map(lambda n: n.strm_bw, c_nodes))/float(len(c_nodes))
-      true_circ_avg[cl] = sum(map(lambda n: (1.0-n.circ_fail_rate),
+      if len(c_nodes) > 0:
+        true_filt_avg[cl] = sum(map(lambda n: n.filt_bw, c_nodes))/float(len(c_nodes))
+        true_strm_avg[cl] = sum(map(lambda n: n.strm_bw, c_nodes))/float(len(c_nodes))
+        true_circ_avg[cl] = sum(map(lambda n: (1.0-n.circ_fail_rate),
                              c_nodes))/float(len(c_nodes))
+      else:
+        true_filt_avg[cl] = 0.0
+        true_strm_avg[cl] = 0.0
+        true_circ_avg[cl] = 0.0
 
       # FIXME: This may be expensive
       pid_tgt_avg[cl] = true_filt_avg[cl]
@@ -504,7 +510,10 @@ def main(argv):
       while prev_pid_avg > pid_tgt_avg[cl]:
         f_nodes = filter(lambda n: n.desc_bw >= pid_tgt_avg[cl], c_nodes)
         prev_pid_avg = pid_tgt_avg[cl]
-        pid_tgt_avg[cl] = sum(map(lambda n: n.filt_bw, f_nodes))/float(len(f_nodes))
+        if len(f_nodes) > 0:
+          pid_tgt_avg[cl] = sum(map(lambda n: n.filt_bw, f_nodes))/float(len(f_nodes))
+        else:
+          pid_tgt_avg[cl] = 0.0
 
       plog("INFO", "Network true_filt_avg["+cl+"]: "+str(true_filt_avg[cl]))
       plog("INFO", "Network pid_tgt_avg["+cl+"]: "+str(pid_tgt_avg[cl]))
@@ -838,10 +847,13 @@ def main(argv):
     c_nodes = filter(lambda n: n.node_class() == cl, nodes.itervalues())
     nc_nodes = filter(lambda n: n.pid_error < 0, c_nodes)
     pc_nodes = filter(lambda n: n.pid_error > 0, c_nodes)
-    plog("INFO", "Avg "+cl+"  pid_error="+str(sum(map(lambda n: n.pid_error, c_nodes))/len(c_nodes)))
-    plog("INFO", "Avg "+cl+" |pid_error|="+str(sum(map(lambda n: abs(n.pid_error), c_nodes))/len(c_nodes)))
-    plog("INFO", "Avg "+cl+" +pid_error=+"+str(sum(map(lambda n: n.pid_error, pc_nodes))/len(pc_nodes)))
-    plog("INFO", "Avg "+cl+" -pid_error="+str(sum(map(lambda n: n.pid_error, nc_nodes))/len(nc_nodes)))
+    if len(c_nodes) > 0:
+      plog("INFO", "Avg "+cl+"  pid_error="+str(sum(map(lambda n: n.pid_error, c_nodes))/len(c_nodes)))
+      plog("INFO", "Avg "+cl+" |pid_error|="+str(sum(map(lambda n: abs(n.pid_error), c_nodes))/len(c_nodes)))
+    if len(pc_nodes) > 0:
+      plog("INFO", "Avg "+cl+" +pid_error=+"+str(sum(map(lambda n: n.pid_error, pc_nodes))/len(pc_nodes)))
+    if len(nc_nodes) > 0:
+      plog("INFO", "Avg "+cl+" -pid_error="+str(sum(map(lambda n: n.pid_error, nc_nodes))/len(nc_nodes)))
 
   n_nodes = filter(lambda n: n.pid_error < 0, nodes.itervalues())
   p_nodes = filter(lambda n: n.pid_error > 0, nodes.itervalues())
@@ -858,10 +870,12 @@ def main(argv):
   n_print = nodes.values()
   n_print.sort(lambda x,y: int(y.pid_error*1000) - int(x.pid_error*1000))
 
+  scan_age = 0
   for scanner in scanner_timestamps.iterkeys():
-    scan_age = int(round(scanner_timestamps[scanner],0))
-    if scan_age < time.time() - MAX_SCAN_AGE:
-      plog("WARN", "Bandwidth scanner "+scanner+" stale. Possible dead bwauthority.py. Timestamp: "+time.ctime(scan_age))
+    this_scan_age = int(round(scanner_timestamps[scanner],0))
+    scan_age = scan_age if scan_age > this_scan_age else this_scan_age
+    if this_scan_age < time.time() - MAX_SCAN_AGE:
+      plog("WARN", "Bandwidth scanner "+scanner+" stale. Possible dead bwauthority.py. Timestamp: "+time.ctime(this_scan_age))
 
   out = file(argv[-1], "w")
   out.write(str(scan_age)+"\n")
@@ -870,7 +884,7 @@ def main(argv):
   for n in n_print:
     if not n.ignore:
       # Turns out str() is more accurate than %lf
-      out.write("node_id="+n.idhex+" bw="+str(base10_round(n.new_bw))+" nick="+n.nick+ " measured_at="+str(int(n.measured_at))+" updated_at="+str(int(n.updated_at))+" pid_error="+str(n.pid_error)+" pid_error_sum="+str(n.pid_error_sum)+" pid_bw="+str(int(n.pid_bw))+" pid_delta="+str(n.pid_delta)+" circ_fail="+str(n.circ_fail_rate)+"\n")
+      out.write("node_id="+n.idhex+" bw="+str(base10_round(n.new_bw))+" nick="+n.nick+ " measured_at="+str(int(n.measured_at))+" updated_at="+str(int(n.updated_at))+" pid_error="+str(n.pid_error)+" pid_error_sum="+str(n.pid_error_sum)+" pid_bw="+str(int(n.pid_bw))+" pid_delta="+str(n.pid_delta)+" circ_fail="+str(n.circ_fail_rate)+" scanner="+str(n.scanner)+"\n")
   out.close()
 
   write_file_list(argv[1])

@@ -7,12 +7,13 @@ DataDirectory ./data/tor.1
 PidFile ./data/tor.1/tor.pid
 CookieAuthentication 1
 FetchUselessDescriptors 1
+# Workaround for Tor #24110, tracked in TorFlow #24094
+UseMicrodescriptors 0
 __LeaveStreamsUnattached 1
 
 # Bad idea? Too much consensus update activity?
 FetchDirInfoExtraEarly 1
 FetchDirInfoEarly 1
 
-# Use CREATE cells for first hop, so we can still measure CPU overload via 
-# circ failure
-FastFirstHopPK 0
+# Turn pathbias off, so it doesn't flood the logs
+UseEntryGuards 0
