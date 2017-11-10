@@ -793,14 +793,27 @@ def main(argv):
         plog("INFO", "New node "+n.idhex+"="+n.nick+" has bandwidth < 0: "+str(n.new_bw))
       n.new_bw = 1
 
+  if len(nodes) == 0:
+    plog("NOTICE", "No nodes have been measured yet")
+    sys.exit(1)
+
+  if len(prev_consensus) == 0:
+    plog("NOTICE", str(len(nodes)) + " nodes have been measured, but we are waiting the next consensus before aggregating them")
+    sys.exit(1)
+
+  current_nodes_in_prev_consensus = filter(lambda n: n.idhex in prev_consensus,
+                                           nodes.itervalues())
+
+  if len(current_nodes_in_prev_consensus) == 0:
+    plog("NOTICE", str(len(nodes)) + " nodes have been measured, but none of them were in the previous consensus")
+    sys.exit(1)
+
   oldest_measured = min(map(lambda n: n.measured_at,
-             filter(lambda n: n.idhex in prev_consensus,
-                       nodes.itervalues())))
+                            current_nodes_in_prev_consensus))
   plog("INFO", "Oldest measured node: "+time.ctime(oldest_measured))
 
   oldest_updated = min(map(lambda n: n.updated_at,
-             filter(lambda n: n.idhex in prev_consensus,
-                       nodes.itervalues())))
+                           current_nodes_in_prev_consensus))
   plog("INFO", "Oldest updated node: "+time.ctime(oldest_updated))
 
   missed_nodes = 0.0
